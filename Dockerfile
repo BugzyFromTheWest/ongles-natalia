@@ -21,4 +21,4 @@ ENV NODE_ENV=production
 # Railway injects PORT at runtime — do not hardcode it here
 EXPOSE 3000
 
-CMD sh -c "node_modules/.bin/next start -p $PORT"
+CMD ["node", "server.js"]
