@@ -17,9 +17,8 @@ RUN npm run build
 RUN mkdir -p /app/data
 
 ENV NODE_ENV=production
-ENV PORT=3000
 
+# Railway injects PORT at runtime — do not hardcode it here
 EXPOSE 3000
 
-# Use shell form so $PORT variable is expanded at runtime by Railway
-CMD node_modules/.bin/next start -p ${PORT}
+CMD sh -c "node_modules/.bin/next start -p $PORT"
