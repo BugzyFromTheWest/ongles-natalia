@@ -42,6 +42,19 @@ body {
   to   { transform: translateX(18px)  rotate(15deg); }
 }
 
+/* Gold flake animations */
+@keyframes goldFlakeFall {
+  0%   { transform: translateY(-20px); opacity: 0; }
+  8%   { opacity: 0.7; }
+  88%  { opacity: 0.4; }
+  100% { transform: translateY(110vh); opacity: 0; }
+}
+
+@keyframes goldFlakeRotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 /* Leaflet */
 .leaflet-container {
   width: 100%;

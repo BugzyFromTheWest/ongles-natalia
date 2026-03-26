@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { useLang } from "@/components/LangProvider";
 
 const FlowerAnimation = dynamic(() => import("@/components/FlowerAnimation"), { ssr: false });
+const GoldFlakesAnimation = dynamic(() => import("@/components/GoldFlakesAnimation"), { ssr: false });
 
 type Service = {
   id: string; category: string; french_name: string; english_name: string;
@@ -74,6 +75,7 @@ export default function HomePage() {
         style={{ background: "linear-gradient(160deg, #7b2d55 0%, #4a1835 55%, #2a1020 100%)" }}
       >
         <FlowerAnimation count={22} className="absolute inset-0 z-0" />
+        <GoldFlakesAnimation count={12} className="absolute inset-0 z-0" />
 
         {/* Nav */}
         <nav className="relative z-10 flex items-center justify-between px-6 py-5">
@@ -341,6 +343,16 @@ export default function HomePage() {
         <p>{business?.address ?? "6362 Alexis-Contant, Montréal, QC, H1M 1E9"}</p>
         <p>{business?.phone ?? "+1 514-652-6284"} · {business?.email ?? "onglesnatalia@gmail.com"}</p>
         <p className="pt-2 text-white/25">© {new Date().getFullYear()} Ongles Natalia. {lang === "fr" ? "Tous droits réservés." : "All rights reserved."}</p>
+        <p className="pt-3 text-white/30 text-[10px] tracking-wide">
+          <a
+            href="https://serverandtechsolutions.ca"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-white/50 transition-colors"
+          >
+            Built by Server &amp; Tech Solutions
+          </a>
+        </p>
       </footer>
     </div>
   );
