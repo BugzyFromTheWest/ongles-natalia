@@ -19,6 +19,6 @@ RUN mkdir -p /app/data
 ENV NODE_ENV=production
 
 # Railway injects PORT at runtime — do not hardcode it here
-EXPOSE 3000
+EXPOSE 8080
 
 CMD ["node", "server.js"]
