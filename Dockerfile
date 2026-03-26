@@ -16,7 +16,10 @@ RUN npm run build
 # Ensure SQLite data directory exists
 RUN mkdir -p /app/data
 
-EXPOSE 3000
 ENV NODE_ENV=production
+ENV PORT=3000
 
-CMD ["npm", "start"]
+EXPOSE 3000
+
+# Use shell form so $PORT variable is expanded at runtime by Railway
+CMD node_modules/.bin/next start -p ${PORT}
