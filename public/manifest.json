@@ -1,0 +1,17 @@
+{
+  "name": "Ongles Natalia",
+  "short_name": "ON!",
+  "description": "Service de manucure mobile · Premium mobile nail services",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#c01960",
+  "theme_color": "#c01960",
+  "icons": [
+    {
+      "src": "/On.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

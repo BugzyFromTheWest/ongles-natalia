@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useLang } from "@/components/LangProvider";
 
 type Settings = {
@@ -15,7 +15,7 @@ type Settings = {
 };
 
 export default function SettingsPage() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const tr = t.settings;
 
   const [form, setForm] = useState<Settings | null>(null);
@@ -23,6 +23,13 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
   const [newUnavailable, setNewUnavailable] = useState("");
+
+  // Password change state
+  const [pwForm, setPwForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwSuccess, setPwSuccess] = useState(false);
+  const [pwError, setPwError] = useState("");
+  const pwRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/settings")
@@ -221,6 +228,102 @@ export default function SettingsPage() {
           </button>
         </div>
       </form>
+
+      {/* Change Password */}
+      <div ref={pwRef} className={section}>
+        <h2 className="font-semibold text-sidebar">{lang === "fr" ? "Changer le mot de passe" : "Change Password"}</h2>
+        {pwError && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">{pwError}</div>
+        )}
+        {pwSuccess && (
+          <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm">
+            ✓ {lang === "fr" ? "Mot de passe modifié avec succès." : "Password changed successfully."}
+          </div>
+        )}
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setPwError("");
+            setPwSuccess(false);
+            if (pwForm.newPassword !== pwForm.confirmPassword) {
+              setPwError(lang === "fr" ? "Les mots de passe ne correspondent pas." : "New passwords do not match.");
+              return;
+            }
+            setPwSaving(true);
+            try {
+              const res = await fetch("/api/admin/change-password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  currentPassword: pwForm.currentPassword,
+                  newPassword: pwForm.newPassword,
+                }),
+              });
+              const data = await res.json();
+              if (!res.ok) {
+                setPwError(data.error || (lang === "fr" ? "Erreur serveur." : "Server error."));
+              } else {
+                setPwSuccess(true);
+                setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+                setTimeout(() => setPwSuccess(false), 4000);
+              }
+            } catch {
+              setPwError(lang === "fr" ? "Erreur réseau." : "Network error.");
+            } finally {
+              setPwSaving(false);
+            }
+          }}
+          className="space-y-4"
+        >
+          <div>
+            <label className={label}>{lang === "fr" ? "Mot de passe actuel" : "Current Password"}</label>
+            <input
+              type="password"
+              value={pwForm.currentPassword}
+              onChange={(e) => setPwForm((f) => ({ ...f, currentPassword: e.target.value }))}
+              required
+              className={field}
+              autoComplete="current-password"
+            />
+          </div>
+          <div>
+            <label className={label}>{lang === "fr" ? "Nouveau mot de passe" : "New Password"}</label>
+            <input
+              type="password"
+              value={pwForm.newPassword}
+              onChange={(e) => setPwForm((f) => ({ ...f, newPassword: e.target.value }))}
+              required
+              minLength={8}
+              className={field}
+              autoComplete="new-password"
+            />
+            <p className="mt-1.5 text-xs text-brand-300">{lang === "fr" ? "Minimum 8 caractères." : "Minimum 8 characters."}</p>
+          </div>
+          <div>
+            <label className={label}>{lang === "fr" ? "Confirmer le nouveau mot de passe" : "Confirm New Password"}</label>
+            <input
+              type="password"
+              value={pwForm.confirmPassword}
+              onChange={(e) => setPwForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+              required
+              minLength={8}
+              className={field}
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={pwSaving}
+              className="px-7 py-3 bg-sidebar hover:bg-sidebar/90 disabled:opacity-60 text-white font-semibold rounded-xl text-sm transition-colors"
+            >
+              {pwSaving
+                ? (lang === "fr" ? "Enregistrement…" : "Saving…")
+                : (lang === "fr" ? "Changer le mot de passe" : "Change Password")}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

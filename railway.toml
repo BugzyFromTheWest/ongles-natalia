@@ -4,3 +4,7 @@ builder = "dockerfile"
 [deploy]
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
+
+[[crons]]
+schedule = "0 13 * * *"
+command = "curl -s -X GET $RAILWAY_PUBLIC_DOMAIN/api/reminders -H 'x-cron-secret: $CRON_SECRET'"

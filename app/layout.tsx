@@ -6,14 +6,19 @@ import "./globals.css";
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
 
 export const metadata: Metadata = {
-  title: "Nails on Wheels",
+  title: "Ongles Natalia",
   description: "Service de manucure mobile · Premium mobile nail services",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/On.png",
+    apple: "/On.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${geist.variable} h-full`}>
-      <body className="min-h-full bg-cream text-sidebar antialiased">
+      <body className="min-h-full text-sidebar antialiased">
         <LangProvider>{children}</LangProvider>
       </body>
     </html>

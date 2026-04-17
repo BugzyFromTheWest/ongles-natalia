@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useLang } from "@/components/LangProvider";
+
+const GoldFlakesAnimation = dynamic(() => import("@/components/GoldFlakesAnimation"), { ssr: false });
 
 function SparkleIcon({ className }: { className?: string }) {
   return (
@@ -46,10 +49,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center px-4"
-      style={{ background: "linear-gradient(135deg, #7b2d55 0%, #4a1835 60%, #2a1020 100%)" }}
-    >
+    <div className="min-h-screen flex items-center justify-center px-4 relative">
+      <GoldFlakesAnimation count={18} className="fixed inset-0 pointer-events-none z-[1]" fullWidth />
       {/* Lang toggle top-right */}
       <div className="fixed top-4 right-4">
         <button
@@ -62,32 +63,32 @@ export default function LoginPage() {
         </button>
       </div>
 
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden">
-        <div className="h-1 bg-gradient-to-r from-brand-400 via-gold-400 to-brand-300" />
+      <div className="relative z-[2] w-full max-w-sm rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.28)", boxShadow: "0 8px 40px rgba(0,0,0,0.2)" }}>
+        <div className="h-1" style={{ background: "linear-gradient(90deg, #FF0080, #f4c56a, #FF0080)" }} />
         <div className="p-8">
           {/* Logo */}
           <div className="flex items-center gap-2.5 mb-8">
-            <div className="w-9 h-9 rounded-xl bg-brand-500 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "rgba(244,197,106,0.25)", border: "1px solid rgba(244,197,106,0.5)" }}>
               <SparkleIcon className="w-5 h-5 text-white" />
             </div>
             <div>
-              <span className="font-semibold text-sidebar text-sm block leading-none">{t.appName}</span>
-              <span className="text-[10px] text-brand-400 tracking-wider uppercase leading-none">Admin</span>
+              <span className="font-semibold text-white text-sm block leading-none">{t.appName}</span>
+              <span className="text-[10px] tracking-wider uppercase leading-none" style={{ color: "#f4c56a" }}>Admin</span>
             </div>
           </div>
 
-          <h1 className="text-xl font-bold text-sidebar mb-1">{tr.title}</h1>
-          <p className="text-sm text-slate-500 mb-6">{tr.subtitle}</p>
+          <h1 className="text-xl font-bold text-white mb-1">{tr.title}</h1>
+          <p className="text-sm text-white/60 mb-6">{tr.subtitle}</p>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+            <div className="mb-4 p-3 bg-red-900/40 border border-red-400/40 rounded-xl text-red-200 text-sm">
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-sidebar/70 mb-1.5 uppercase tracking-wider">
+              <label className="block text-xs font-semibold text-white/80 mb-1.5 uppercase tracking-wider">
                 {tr.email}
               </label>
               <input
@@ -95,11 +96,12 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full border border-brand-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 bg-brand-50/30"
+                className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none text-white"
+                style={{ background: "rgba(255,255,255,0.18)", border: "1px solid rgba(255,255,255,0.3)" }}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-sidebar/70 mb-1.5 uppercase tracking-wider">
+              <label className="block text-xs font-semibold text-white/80 mb-1.5 uppercase tracking-wider">
                 {tr.password}
               </label>
               <input
@@ -107,19 +109,21 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full border border-brand-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 bg-brand-50/30"
+                className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none text-white"
+                style={{ background: "rgba(255,255,255,0.18)", border: "1px solid rgba(255,255,255,0.3)" }}
               />
             </div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-700 hover:to-brand-600 disabled:opacity-60 text-white font-semibold py-3.5 rounded-xl text-sm transition-all shadow-lg shadow-brand-300/30 mt-2"
+              className="w-full disabled:opacity-60 text-white font-bold py-3.5 rounded-xl text-sm transition-all mt-2"
+              style={{ background: "linear-gradient(135deg, #ff3ebf, #ff4fd8)", boxShadow: "0 4px 20px rgba(255,62,191,0.45)" }}
             >
               {loading ? tr.submitting : tr.submit}
             </button>
           </form>
 
-          <p className="mt-6 text-xs text-slate-400 text-center">{tr.defaultHint}</p>
+          <p className="mt-6 text-xs text-white/40 text-center">{tr.defaultHint}</p>
         </div>
       </div>
     </div>

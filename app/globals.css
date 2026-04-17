@@ -11,20 +11,25 @@
   --color-brand-700: #9a234a;
   --color-brand-800: #7e1e3e;
   --color-brand-900: #661a33;
-  --color-gold-300: #e0c48e;
-  --color-gold-400: #d4a96a;
-  --color-gold-500: #c9a07a;
-  --color-cream: #fdf5f0;
-  --color-sidebar: #2a1924;
+  --color-gold-300: #f4c56a;
+  --color-gold-400: #e8b050;
+  --color-gold-500: #d4a040;
+  --color-cream: #fff8fc;
+  --color-sidebar: #1a0d14;
 }
 
 :root {
   --background: #fdf5f0;
-  --foreground: #2a1924;
+  --foreground: #1a0d14;
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(ellipse 80% 55% at 90% 8%,  rgba(244, 197, 106, 0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 70% 45% at 10% 92%, rgba(244, 197, 106, 0.12) 0%, transparent 70%),
+    linear-gradient(160deg, #ff3ebf 0%, #f030c8 35%, #e020b8 65%, #f030c0 100%);
+  background-attachment: fixed;
+  min-height: 100%;
   color: var(--foreground);
   font-family: var(--font-geist-sans, Arial, sans-serif);
 }
@@ -44,15 +49,32 @@ body {
 
 /* Gold flake animations */
 @keyframes goldFlakeFall {
-  0%   { transform: translateY(-20px); opacity: 0; }
-  8%   { opacity: 0.7; }
-  88%  { opacity: 0.4; }
+  0%   { transform: translateY(-30px); opacity: 0; }
+  6%   { opacity: 1; }
+  82%  { opacity: 0.85; }
   100% { transform: translateY(110vh); opacity: 0; }
 }
 
 @keyframes goldFlakeRotate {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
+}
+
+@keyframes goldFlakeSway {
+  0%   { transform: translateX(0px); }
+  25%  { transform: translateX(14px); }
+  75%  { transform: translateX(-14px); }
+  100% { transform: translateX(0px); }
+}
+
+@keyframes goldFlakeTwinkle {
+  0%, 100% { transform: scale(1);    opacity: 0.9; }
+  50%       { transform: scale(1.35); opacity: 1; }
+}
+
+@keyframes goldFlakeGlow {
+  0%, 100% { filter: brightness(1) drop-shadow(0 0 2px rgba(255,215,0,0.6)); }
+  50%       { filter: brightness(1.4) drop-shadow(0 0 6px rgba(255,215,0,1)); }
 }
 
 /* Leaflet */

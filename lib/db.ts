@@ -99,6 +99,7 @@ function initSchema(db: Database.Database) {
   const apptCols = (db.prepare("PRAGMA table_info(appointments)").all() as {name:string}[]).map(c => c.name);
   if (!apptCols.includes("service_id")) db.exec("ALTER TABLE appointments ADD COLUMN service_id TEXT");
   if (!apptCols.includes("total_price")) db.exec("ALTER TABLE appointments ADD COLUMN total_price REAL");
+  if (!apptCols.includes("cancel_token")) db.exec("ALTER TABLE appointments ADD COLUMN cancel_token TEXT");
 
   // Seed default admin
   const { c } = db.prepare("SELECT COUNT(*) as c FROM admin_users").get() as { c: number };
@@ -300,16 +301,16 @@ export function getAppointmentsForDate(date: string): Appointment[] {
   ).all(date) as Appointment[];
 }
 
-export function createAppointment(data: Omit<Appointment, "id" | "created_at" | "updated_at">): Appointment {
+export function createAppointment(data: Omit<Appointment, "id" | "created_at" | "updated_at"> & { cancel_token?: string }): Appointment {
   const id = genId();
   getDb().prepare(`
     INSERT INTO appointments
     (id, customer_name, phone, email, address, lat, lng, service_requested,
-     service_id, total_price, notes, status, scheduled_date, scheduled_time)
+     service_id, total_price, notes, status, scheduled_date, scheduled_time, cancel_token)
     VALUES
     (@id, @customer_name, @phone, @email, @address, @lat, @lng, @service_requested,
-     @service_id, @total_price, @notes, @status, @scheduled_date, @scheduled_time)
-  `).run({ id, ...data });
+     @service_id, @total_price, @notes, @status, @scheduled_date, @scheduled_time, @cancel_token)
+  `).run({ id, cancel_token: null, ...data });
   return getAppointmentById(id)!;
 }
 
@@ -324,4 +325,8 @@ export function updateAppointment(id: string, data: Partial<Appointment>): Appoi
 
 export function deleteAppointment(id: string) {
   getDb().prepare("DELETE FROM appointments WHERE id = ?").run(id);
+}
+
+export function getAppointmentByCancelToken(token: string): Appointment | undefined {
+  return getDb().prepare("SELECT * FROM appointments WHERE cancel_token = ?").get(token) as Appointment | undefined;
 }
