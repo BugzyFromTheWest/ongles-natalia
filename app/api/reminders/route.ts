@@ -1,15 +1,20 @@
 import { NextResponse } from 'next/server'
-import { getAllAppointments } from '@/lib/db'
+import { getAllAppointments, getSettings, expireStaleBookings } from '@/lib/db'
 import { sendAppointmentReminder } from '@/lib/email'
 import { sendReminderSMS } from '@/lib/sms'
 
 export async function GET(request: Request) {
-  // Verify cron secret to prevent public access
   const secret = request.headers.get('x-cron-secret')
   if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const settings = getSettings()
+
+  // Auto-expire stale unpaid pending bookings
+  const expired = expireStaleBookings(settings.pending_expiry_hours ?? 24)
+
+  // Send reminders for appointments tomorrow
   const tomorrow = new Date()
   tomorrow.setDate(tomorrow.getDate() + 1)
   const tomorrowStr = tomorrow.toISOString().split('T')[0]
@@ -43,5 +48,5 @@ export async function GET(request: Request) {
     )
   )
 
-  return NextResponse.json({ sent: upcoming.length, results: results.length })
+  return NextResponse.json({ reminders_sent: upcoming.length, expired_bookings: expired })
 }

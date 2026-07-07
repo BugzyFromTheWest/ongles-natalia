@@ -17,6 +17,7 @@ export function getDb(): Database.Database {
     const db = new Database(DB_PATH);
     db.pragma("journal_mode = WAL");
     db.pragma("foreign_keys = ON");
+    db.pragma("busy_timeout = 5000");
     initSchema(db);
     global.__schedulerDb = db;
   }
@@ -95,11 +96,25 @@ function initSchema(db: Database.Database) {
     INSERT OR IGNORE INTO business_info (id, hours) VALUES (1, '{"1":"9h – 18h","2":"9h – 18h","3":"9h – 18h","4":"9h – 18h","5":"9h – 18h","6":"9h – 17h","0":"Fermé"}');
   `);
 
-  // Safe migration: add columns to appointments if missing
+  // Safe additive migrations — appointments
   const apptCols = (db.prepare("PRAGMA table_info(appointments)").all() as {name:string}[]).map(c => c.name);
-  if (!apptCols.includes("service_id")) db.exec("ALTER TABLE appointments ADD COLUMN service_id TEXT");
-  if (!apptCols.includes("total_price")) db.exec("ALTER TABLE appointments ADD COLUMN total_price REAL");
-  if (!apptCols.includes("cancel_token")) db.exec("ALTER TABLE appointments ADD COLUMN cancel_token TEXT");
+  if (!apptCols.includes("service_id"))       db.exec("ALTER TABLE appointments ADD COLUMN service_id TEXT");
+  if (!apptCols.includes("total_price"))      db.exec("ALTER TABLE appointments ADD COLUMN total_price REAL");
+  if (!apptCols.includes("cancel_token"))     db.exec("ALTER TABLE appointments ADD COLUMN cancel_token TEXT");
+  if (!apptCols.includes("payment_status"))   db.exec("ALTER TABLE appointments ADD COLUMN payment_status TEXT NOT NULL DEFAULT 'unpaid'");
+  if (!apptCols.includes("stripe_session_id"))db.exec("ALTER TABLE appointments ADD COLUMN stripe_session_id TEXT");
+  if (!apptCols.includes("amount_paid"))      db.exec("ALTER TABLE appointments ADD COLUMN amount_paid INTEGER");
+  if (!apptCols.includes("booking_source"))   db.exec("ALTER TABLE appointments ADD COLUMN booking_source TEXT NOT NULL DEFAULT 'web'");
+
+  // Safe additive migrations — settings feature flags
+  const settingsCols = (db.prepare("PRAGMA table_info(settings)").all() as {name:string}[]).map(c => c.name);
+  if (!settingsCols.includes("require_payment"))              db.exec("ALTER TABLE settings ADD COLUMN require_payment INTEGER NOT NULL DEFAULT 0");
+  if (!settingsCols.includes("payment_type"))                 db.exec("ALTER TABLE settings ADD COLUMN payment_type TEXT NOT NULL DEFAULT 'full'");
+  if (!settingsCols.includes("deposit_percent"))              db.exec("ALTER TABLE settings ADD COLUMN deposit_percent INTEGER NOT NULL DEFAULT 50");
+  if (!settingsCols.includes("enforce_cancellation_policy"))  db.exec("ALTER TABLE settings ADD COLUMN enforce_cancellation_policy INTEGER NOT NULL DEFAULT 0");
+  if (!settingsCols.includes("pending_expiry_hours"))         db.exec("ALTER TABLE settings ADD COLUMN pending_expiry_hours INTEGER NOT NULL DEFAULT 24");
+  if (!settingsCols.includes("client_accounts_enabled"))      db.exec("ALTER TABLE settings ADD COLUMN client_accounts_enabled INTEGER NOT NULL DEFAULT 0");
+  if (!settingsCols.includes("calendar_token"))               db.exec("ALTER TABLE settings ADD COLUMN calendar_token TEXT");
 
   // Seed default admin
   const { c } = db.prepare("SELECT COUNT(*) as c FROM admin_users").get() as { c: number };
@@ -129,7 +144,6 @@ function seedServices(db: Database.Database) {
     // MANUCURE
     { id: "svc-man-01", category: "manicure", french_name: "Manucure Reg.", english_name: "Regular Manicure", price_type: "fixed", price: 60, duration_minutes: 60, duration_label: "1 h", description_fr: "", description_en: "", sort_order: 1 },
     { id: "svc-man-02", category: "manicure", french_name: "Manucure", english_name: "Manicure", price_type: "fixed", price: 115, duration_minutes: 90, duration_label: "1 h 30 min", description_fr: "", description_en: "", sort_order: 2 },
-    { id: "svc-man-03", category: "manicure", french_name: "Manucure Gel Express", english_name: "Express Gel Manicure", price_type: "fixed", price: 55, duration_minutes: 30, duration_label: "30 min", description_fr: "", description_en: "", sort_order: 3 },
     { id: "svc-man-04", category: "manicure", french_name: "Manucure sans vernis", english_name: "Manicure without nail polish", price_type: "starting_at", price: 60, duration_minutes: 90, duration_label: "1 h 30 min+", description_fr: "", description_en: "", sort_order: 4 },
     { id: "svc-man-05", category: "manicure", french_name: "Recouvrement gel", english_name: "Gel Overlay", price_type: "fixed", price: 90, duration_minutes: 150, duration_label: "2 h 30 min", description_fr: "", description_en: "", sort_order: 5 },
     // PÉDICURE
@@ -195,6 +209,14 @@ export type Settings = {
   unavailable_days: string;
   working_days: string;
   cluster_radius_km: number;
+  // Feature flags
+  require_payment: number;         // 0=off, 1=on
+  payment_type: "full" | "deposit";
+  deposit_percent: number;
+  enforce_cancellation_policy: number; // 0=off, 1=on
+  pending_expiry_hours: number;
+  client_accounts_enabled: number; // 0=off, 1=on
+  calendar_token: string | null;
 };
 
 export type Appointment = {
@@ -212,6 +234,11 @@ export type Appointment = {
   status: "pending" | "confirmed" | "completed" | "cancelled";
   scheduled_date: string | null;
   scheduled_time: string | null;
+  cancel_token: string | null;
+  payment_status: "unpaid" | "deposit_paid" | "paid" | "refunded";
+  stripe_session_id: string | null;
+  amount_paid: number | null;
+  booking_source: "web" | "admin" | "rebook";
   created_at: string;
   updated_at: string;
 };
@@ -302,16 +329,45 @@ export function getAppointmentsForDate(date: string): Appointment[] {
 }
 
 export function createAppointment(data: Omit<Appointment, "id" | "created_at" | "updated_at"> & { cancel_token?: string }): Appointment {
+  const db = getDb();
   const id = genId();
-  getDb().prepare(`
-    INSERT INTO appointments
-    (id, customer_name, phone, email, address, lat, lng, service_requested,
-     service_id, total_price, notes, status, scheduled_date, scheduled_time, cancel_token)
-    VALUES
-    (@id, @customer_name, @phone, @email, @address, @lat, @lng, @service_requested,
-     @service_id, @total_price, @notes, @status, @scheduled_date, @scheduled_time, @cancel_token)
-  `).run({ id, cancel_token: null, ...data });
+
+  // Atomic: re-check capacity inside the transaction to prevent race conditions
+  const doInsert = db.transaction(() => {
+    if (data.scheduled_date) {
+      const { max } = db.prepare("SELECT max_appointments_per_day as max FROM settings WHERE id = 1").get() as { max: number };
+      const { cnt } = db.prepare(
+        "SELECT COUNT(*) as cnt FROM appointments WHERE scheduled_date = ? AND status NOT IN ('cancelled')"
+      ).get(data.scheduled_date) as { cnt: number };
+      if (cnt >= max) throw new Error("CAPACITY_EXCEEDED");
+    }
+    db.prepare(`
+      INSERT INTO appointments
+      (id, customer_name, phone, email, address, lat, lng, service_requested,
+       service_id, total_price, notes, status, scheduled_date, scheduled_time,
+       cancel_token, payment_status, stripe_session_id, amount_paid, booking_source)
+      VALUES
+      (@id, @customer_name, @phone, @email, @address, @lat, @lng, @service_requested,
+       @service_id, @total_price, @notes, @status, @scheduled_date, @scheduled_time,
+       @cancel_token, @payment_status, @stripe_session_id, @amount_paid, @booking_source)
+    `).run({ ...data, id });
+  });
+
+  doInsert();
   return getAppointmentById(id)!;
+}
+
+export function expireStaleBookings(expiryHours: number): number {
+  const db = getDb();
+  const cutoff = new Date(Date.now() - expiryHours * 60 * 60 * 1000).toISOString();
+  const result = db.prepare(`
+    UPDATE appointments
+    SET status = 'cancelled', updated_at = datetime('now')
+    WHERE status = 'pending'
+      AND payment_status = 'unpaid'
+      AND created_at < ?
+  `).run(cutoff);
+  return result.changes;
 }
 
 export function updateAppointment(id: string, data: Partial<Appointment>): Appointment | undefined {

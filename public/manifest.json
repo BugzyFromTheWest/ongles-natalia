@@ -1,17 +1,16 @@
 {
   "name": "Ongles Natalia",
-  "short_name": "ON!",
-  "description": "Service de manucure mobile · Premium mobile nail services",
+  "short_name": "Ongles Natalia",
+  "description": "Mobile nail studio — book your appointment",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#c01960",
-  "theme_color": "#c01960",
+  "background_color": "#a01060",
+  "theme_color": "#a01060",
+  "orientation": "portrait",
   "icons": [
-    {
-      "src": "/On.png",
-      "sizes": "any",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

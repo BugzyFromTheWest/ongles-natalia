@@ -42,3 +42,10 @@ next-env.d.ts
 
 # SQLite database (lives on server, not in git)
 /data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Railway
+.railwayignore

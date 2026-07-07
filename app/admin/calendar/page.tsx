@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useLang } from "@/components/LangProvider";
 
+
 type Appointment = {
   id: string;
   customer_name: string;
@@ -32,6 +33,8 @@ export default function CalendarPage() {
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [calToken, setCalToken] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,9 +43,11 @@ export default function CalendarPage() {
     Promise.all([
       fetch("/api/appointments").then((r) => r.json()),
       fetch("/api/settings").then((r) => r.json()),
-    ]).then(([appts, sets]) => {
+      fetch("/api/calendar/token").then((r) => r.json()).catch(() => null),
+    ]).then(([appts, sets, calData]) => {
       setAppointments(appts);
       setSettings(sets);
+      if (calData?.token) setCalToken(calData.token);
       setLoading(false);
     });
   }, []);
@@ -274,6 +279,51 @@ export default function CalendarPage() {
           )}
         </div>
       </div>
+
+      {/* iCal subscribe */}
+      {calToken && (
+        <div className="bg-white rounded-2xl shadow-sm border border-brand-100 p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
+              <svg className="w-4 h-4 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-sidebar">
+                {lang === "fr" ? "Abonnement calendrier" : "Subscribe to Calendar"}
+              </p>
+              <p className="text-xs text-brand-400">
+                {lang === "fr"
+                  ? "Ajoutez ce lien dans Apple Calendar ou Google Calendar pour un suivi en temps réel."
+                  : "Add this link to Apple Calendar or Google Calendar to stay synced automatically."}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <input
+              readOnly
+              value={typeof window !== "undefined" ? `${window.location.origin}/api/calendar?token=${calToken}` : `/api/calendar?token=${calToken}`}
+              className="flex-1 text-xs bg-brand-50 border border-brand-100 rounded-xl px-3 py-2.5 text-slate-500 font-mono truncate focus:outline-none"
+            />
+            <button
+              onClick={() => {
+                const url = `${window.location.origin}/api/calendar?token=${calToken}`;
+                navigator.clipboard.writeText(url).then(() => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                });
+              }}
+              className="shrink-0 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all"
+              style={copied
+                ? { background: "rgba(160,16,96,0.1)", color: "#a01060", border: "1px solid rgba(160,16,96,0.2)" }
+                : { background: "#a01060", color: "#fff" }}
+            >
+              {copied ? (lang === "fr" ? "Copié ✓" : "Copied ✓") : (lang === "fr" ? "Copier" : "Copy")}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

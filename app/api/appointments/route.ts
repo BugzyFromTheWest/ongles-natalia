@@ -68,6 +68,10 @@ export async function POST(req: NextRequest) {
       scheduled_date: date,
       scheduled_time: time,
       cancel_token: cancelToken,
+      payment_status: "unpaid",
+      stripe_session_id: null,
+      amount_paid: null,
+      booking_source: "web",
     });
 
     // Fire notifications in parallel — failures don't break booking

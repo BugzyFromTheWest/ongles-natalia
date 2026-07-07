@@ -81,7 +81,7 @@ function ServicesInner() {
 
   return (
     <div className="relative min-h-screen">
-      <GoldFlakesAnimation count={20} className="fixed inset-0 pointer-events-none z-[1]" fullWidth />
+      <GoldFlakesAnimation count={12} className="fixed inset-0 pointer-events-none z-[1]" fullWidth />
 
       {/* Header */}
       <header className="relative z-[2] px-6 py-5 flex items-center justify-between">
@@ -101,8 +101,13 @@ function ServicesInner() {
           <LangToggle />
           <Link
             href="/book"
-            className="px-4 py-2 rounded-xl text-white text-xs font-bold transition-all shadow-lg"
-            style={{ background: "rgba(255,255,255,0.22)", backdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.3)" }}
+            className="px-4 py-2 rounded-xl text-white text-xs font-bold transition-all"
+            style={{
+              background: "linear-gradient(135deg, rgba(244,197,106,0.22) 0%, rgba(255,255,255,0.15) 100%)",
+              backdropFilter: "blur(10px)",
+              border: "1px solid rgba(244,197,106,0.38)",
+              boxShadow: "0 2px 14px rgba(0,0,0,0.15)",
+            }}
           >
             {lang === "fr" ? "Réserver" : "Book Now"}
           </Link>
@@ -131,8 +136,17 @@ function ServicesInner() {
               className="px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all"
               style={
                 activeTab === cat
-                  ? { background: "rgba(255,255,255,0.95)", color: "#d0245c", border: "1px solid rgba(255,255,255,0.9)", boxShadow: "0 2px 12px rgba(0,0,0,0.12)" }
-                  : { background: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.8)", border: "1px solid rgba(255,255,255,0.25)" }
+                  ? {
+                      background: "linear-gradient(135deg, #f4c56a 0%, #e8b050 100%)",
+                      color: "#4a1a00",
+                      border: "1px solid rgba(244,197,106,0.7)",
+                      boxShadow: "0 2px 16px rgba(244,197,106,0.30)",
+                    }
+                  : {
+                      background: "rgba(255,255,255,0.08)",
+                      color: "rgba(255,255,255,0.75)",
+                      border: "1px solid rgba(255,255,255,0.18)",
+                    }
               }
             >
               {CATEGORY_LABELS[cat]?.[lang] ?? cat}
@@ -157,7 +171,12 @@ function ServicesInner() {
               <div
                 key={s.id}
                 className="rounded-2xl p-5 transition-all"
-                style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.28)", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
+                style={{
+                  background: "rgba(255,255,255,0.09)",
+                  backdropFilter: "blur(20px)",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  boxShadow: "0 8px 32px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.10)",
+                }}
               >
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <h3 className="font-bold text-white text-base leading-snug">
@@ -184,7 +203,11 @@ function ServicesInner() {
                 <Link
                   href={`/book?service=${s.id}`}
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-white text-xs font-bold transition-all"
-                  style={{ background: "rgba(255,255,255,0.22)", border: "1px solid rgba(255,255,255,0.35)" }}
+                  style={{
+                    background: "rgba(255,255,255,0.10)",
+                    border: "1px solid rgba(244,197,106,0.28)",
+                    boxShadow: "0 1px 8px rgba(0,0,0,0.12)",
+                  }}
                 >
                   ✦ {lang === "fr" ? "Réserver" : "Book"}
                 </Link>

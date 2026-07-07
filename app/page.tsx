@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useLang } from "@/components/LangProvider";
 
@@ -39,17 +40,92 @@ const FEATURED_CATEGORIES = ["manicure", "pedicure", "extensions", "nail_art"];
 
 export default function HomePage() {
   const { lang } = useLang();
+  const router = useRouter();
   const [services, setServices] = useState<Service[]>([]);
   const [business, setBusiness] = useState<Business | null>(null);
   const [showSplash, setShowSplash] = useState(true);
   const [today, setToday] = useState(-1);
   const [currentYear, setCurrentYear] = useState(2026);
+  const [fabVisible, setFabVisible] = useState(false);
+  const lastScrollY = useRef(0);
+  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const adminOverlayRef = useRef<HTMLButtonElement>(null);
+  const logoHoldTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [logoHolding, setLogoHolding] = useState(false);
+
+  // Invisible overlay button captures touch before iOS image context menu fires.
+  // Must be non-passive so preventDefault() actually blocks the callout sheet.
+  useEffect(() => {
+    const el = adminOverlayRef.current;
+    if (!el) return;
+
+    function cancelHold() {
+      setLogoHolding(false);
+      if (logoHoldTimer.current) { clearTimeout(logoHoldTimer.current); logoHoldTimer.current = null; }
+    }
+
+    function onTouchStart(e: TouchEvent) {
+      e.preventDefault();
+      setLogoHolding(true);
+      logoHoldTimer.current = setTimeout(() => {
+        try { navigator.vibrate?.(10); } catch { /* ignore */ }
+        router.push("/admin/login");
+      }, 800);
+    }
+
+    function onContextMenu(e: Event) { e.preventDefault(); }
+
+    el.addEventListener("touchstart",  onTouchStart,  { passive: false });
+    el.addEventListener("touchend",    cancelHold,    { passive: true });
+    el.addEventListener("touchmove",   cancelHold,    { passive: true });
+    el.addEventListener("touchcancel", cancelHold,    { passive: true });
+    el.addEventListener("contextmenu", onContextMenu, { passive: false });
+    // Desktop fallback: mousedown / mouseup
+    el.addEventListener("mousedown", onTouchStart as unknown as EventListener);
+    el.addEventListener("mouseup",   cancelHold);
+    el.addEventListener("mouseleave",cancelHold);
+
+    return () => {
+      el.removeEventListener("touchstart",  onTouchStart as unknown as EventListener);
+      el.removeEventListener("touchend",    cancelHold);
+      el.removeEventListener("touchmove",   cancelHold);
+      el.removeEventListener("touchcancel", cancelHold);
+      el.removeEventListener("contextmenu", onContextMenu);
+      el.removeEventListener("mousedown",   onTouchStart as unknown as EventListener);
+      el.removeEventListener("mouseup",     cancelHold);
+      el.removeEventListener("mouseleave",  cancelHold);
+    };
+  }, [router]);
 
   useEffect(() => {
     fetch("/api/services").then(r => r.json()).then(setServices);
     fetch("/api/business").then(r => r.json()).then(setBusiness);
     setToday(new Date().getDay());
     setCurrentYear(new Date().getFullYear());
+  }, []);
+
+  useEffect(() => {
+    function onScroll() {
+      const y = window.scrollY;
+      const scrolledPastHero = y > window.innerHeight * 0.6;
+      const scrollingDown = y > lastScrollY.current;
+      lastScrollY.current = y;
+
+      if (!scrolledPastHero) { setFabVisible(false); return; }
+      if (scrollingDown) {
+        setFabVisible(false);
+      } else {
+        setFabVisible(true);
+      }
+      // Also show briefly after scroll stops
+      if (scrollTimer.current) clearTimeout(scrollTimer.current);
+      scrollTimer.current = setTimeout(() => setFabVisible(true), 600);
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (scrollTimer.current) clearTimeout(scrollTimer.current);
+    };
   }, []);
 
   const featured = FEATURED_CATEGORIES.map(cat =>
@@ -63,20 +139,67 @@ export default function HomePage() {
   return (
     <div className="min-h-screen">
       {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
-      <GoldFlakesAnimation count={22} className="fixed inset-0 pointer-events-none z-[1]" fullWidth />
+      <GoldFlakesAnimation count={14} className="fixed inset-0 pointer-events-none z-[1]" fullWidth />
 
       {/* ── HERO ──────────────────────────────────────────────────────── */}
-      <section className="relative min-h-screen flex flex-col overflow-hidden z-[2]">
+      <section
+        className="relative min-h-screen flex flex-col overflow-hidden z-[2]"
+        style={{
+          backgroundImage: "url('/On.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center 20%",
+          backgroundRepeat: "no-repeat",
+        }}
+      >
+        {/* Blending overlay — top brand tint → transparent centre → solid brand at bottom */}
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 0, pointerEvents: "none",
+          background: [
+            "linear-gradient(to bottom,",
+            "rgba(107,15,58,0.72) 0%,",
+            "rgba(160,16,88,0.42) 28%,",
+            "rgba(160,16,88,0.30) 52%,",
+            "rgba(120,12,68,0.70) 74%,",
+            "rgba(107,15,58,0.97) 90%,",
+            "rgba(107,15,58,1.00) 100%)"
+          ].join(" "),
+        }} />
 
         {/* Nav */}
         <nav className="relative z-10 flex items-center justify-between px-6 py-5">
           <div className="flex items-center gap-2.5">
-            <div style={{ width: 32, height: 32, borderRadius: 9, overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.15)" }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/On.png"
-                alt="ON!"
-                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+            {/* Logo + invisible admin overlay — overlay sits on top so iOS never sees an image press */}
+            <div style={{ position: "relative", width: 32, height: 32, flexShrink: 0 }}>
+              {/* Image — pointer-events:none so it never receives touch events */}
+              <div style={{
+                width: 32, height: 32, borderRadius: 9, overflow: "hidden",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
+                transition: "transform 0.15s, opacity 0.15s",
+                transform: logoHolding ? "scale(0.88)" : "scale(1)",
+                opacity: logoHolding ? 0.65 : 1,
+              }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/On.png"
+                  alt="ON!"
+                  draggable={false}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", pointerEvents: "none" }}
+                />
+              </div>
+              {/* Invisible trigger — no image content, so iOS shows no context menu */}
+              <button
+                ref={adminOverlayRef}
+                aria-hidden="true"
+                tabIndex={-1}
+                style={{
+                  position: "absolute", inset: -6,
+                  background: "transparent", border: "none", outline: "none",
+                  borderRadius: 12, cursor: "default",
+                  touchAction: "none",
+                  WebkitTouchCallout: "none",
+                  WebkitUserSelect: "none",
+                  userSelect: "none",
+                } as React.CSSProperties}
               />
             </div>
             <div>
@@ -96,28 +219,21 @@ export default function HomePage() {
         </nav>
 
         {/* Hero content */}
-        <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-6 py-16">
-          <div className="inline-flex items-center gap-2 bg-white/12 backdrop-blur border border-white/20 rounded-full px-4 py-1.5 mb-7">
-            <span className="text-white/75 text-[10px] tracking-[0.2em] uppercase font-medium">
+        <div className="relative z-10 flex-1 flex flex-col items-center justify-end text-center px-6 pb-16 pt-24 sm:justify-center sm:py-16">
+          <div className="inline-flex items-center gap-2 backdrop-blur rounded-full px-4 py-1.5 mb-7"
+            style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(244,197,106,0.25)" }}>
+            <span className="text-white/70 text-[10px] tracking-[0.2em] uppercase font-medium">
               {lang === "fr" ? "Service de manucure mobile · Montréal" : "Mobile nail service · Montréal"}
             </span>
           </div>
 
-          {/* ON! logo — hero focal point */}
-          <div style={{ width: 200, height: 200, borderRadius: 28, overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.15)", marginBottom: 8 }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/On.png"
-              alt="ON! Ongles Natalia"
-              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-            />
-          </div>
-
-          <p className="text-white/80 text-sm font-semibold tracking-[0.18em] uppercase mb-2">
+          <p className="text-white text-base font-bold tracking-[0.22em] uppercase mb-2"
+            style={{ textShadow: "0 2px 16px rgba(0,0,0,0.45)" }}>
             Ongles Natalia
           </p>
 
-          <p className="text-white/60 text-base sm:text-lg max-w-sm mt-2 mb-10 leading-relaxed">
+          <p className="text-white/75 text-base sm:text-lg max-w-sm mt-1 mb-8 leading-relaxed"
+            style={{ textShadow: "0 2px 12px rgba(0,0,0,0.40)" }}>
             {lang === "fr"
               ? "Votre spécialiste en manucure mobile à domicile."
               : "Your mobile nail specialist, coming to you."}
@@ -126,17 +242,41 @@ export default function HomePage() {
           <div className="flex flex-col sm:flex-row gap-3">
             <Link
               href="/book"
-              className="px-8 py-4 rounded-2xl font-bold text-white text-sm tracking-wide transition-all shadow-xl"
-              style={{ background: "rgba(255,255,255,0.22)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.3)" }}
+              className="btn-press shimmer-btn px-8 py-4 rounded-2xl font-bold text-white text-sm tracking-wide transition-all"
+              style={{
+                background: "linear-gradient(135deg, rgba(244,197,106,0.22) 0%, rgba(255,255,255,0.18) 100%)",
+                backdropFilter: "blur(14px)",
+                border: "1px solid rgba(244,197,106,0.40)",
+                boxShadow: "0 4px 24px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.15)",
+              }}
             >
               {lang === "fr" ? "✦ Réserver maintenant" : "✦ Book now"}
             </Link>
             <Link
               href="/services"
-              className="px-8 py-4 rounded-2xl font-semibold text-white/80 text-sm border border-white/20 bg-white/10 hover:bg-white/20 backdrop-blur transition-all"
+              className="px-8 py-4 rounded-2xl font-semibold text-white/75 text-sm backdrop-blur transition-all"
+              style={{
+                background: "rgba(255,255,255,0.08)",
+                border: "1px solid rgba(255,255,255,0.18)",
+                boxShadow: "0 2px 12px rgba(0,0,0,0.12)",
+              }}
             >
               {lang === "fr" ? "Voir nos services" : "View services"}
             </Link>
+          </div>
+
+          {/* Trust strip */}
+          <div className="flex items-center justify-center gap-2 mt-6 flex-wrap">
+            {[
+              lang === "fr" ? "Service mobile" : "Mobile service",
+              "Montréal",
+              lang === "fr" ? "Réservation sécurisée" : "Secure booking",
+            ].map((item, i, arr) => (
+              <span key={i} className="flex items-center gap-2">
+                <span className="text-white/38 text-[10px] tracking-wider font-medium">{item}</span>
+                {i < arr.length - 1 && <span className="text-white/18 text-[10px]">·</span>}
+              </span>
+            ))}
           </div>
         </div>
 
@@ -158,7 +298,6 @@ export default function HomePage() {
             <h2 className="text-3xl font-bold text-white">
               {lang === "fr" ? "Nos soins vedettes" : "Featured services"}
             </h2>
-            <div className="w-12 h-0.5 mx-auto mt-3" style={{ background: "linear-gradient(90deg, #f4c56a, rgba(255,255,255,0.6))" }} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
@@ -166,12 +305,17 @@ export default function HomePage() {
               <Link
                 key={s.id}
                 href={`/book?service=${s.id}`}
-                className="group rounded-2xl p-5 transition-all hover:scale-[1.02]"
-                style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.28)", boxShadow: "0 4px 20px rgba(0,0,0,0.12)" }}
+                className="group animate-fade-in-up card-hover rounded-2xl p-5 transition-all"
+                style={{
+                  background: "rgba(255,255,255,0.10)",
+                  backdropFilter: "blur(18px)",
+                  border: "1px solid rgba(255,255,255,0.20)",
+                  boxShadow: "0 8px 32px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.12)",
+                }}
               >
                 <div
                   className="w-9 h-9 rounded-xl flex items-center justify-center mb-4"
-                  style={{ background: "rgba(255,255,255,0.2)", border: "1px solid rgba(255,255,255,0.4)" }}
+                  style={{ background: "rgba(244,197,106,0.18)", border: "1px solid rgba(244,197,106,0.35)" }}
                 >
                   <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 2l1.8 6.2 6.2 1.8-6.2 1.8L12 18l-1.8-6.2L4 9.8l6.2-1.8z" />
@@ -183,12 +327,19 @@ export default function HomePage() {
                 {lang === "fr" && s.english_name !== s.french_name && (
                   <p className="text-xs text-white/50 mb-2">{s.english_name}</p>
                 )}
-                <div className="flex items-center gap-2 mt-3">
-                  <span className="font-bold text-sm" style={{ color: "#f4c56a" }}>{fmtPrice(s.price, s.price_type, lang)}</span>
-                  <span className="text-white/50 text-xs">· {s.duration_label}</span>
+                <div className="mt-3 space-y-0.5">
+                  <span className="block font-bold text-base" style={{ color: "#f4c56a" }}>{fmtPrice(s.price, s.price_type, lang)}</span>
+                  <span className="block text-white/50 text-xs">{s.duration_label}</span>
                 </div>
-                <div className="mt-3 text-[10px] font-semibold text-white/60 group-hover:text-white transition-colors tracking-wide uppercase">
-                  {lang === "fr" ? "Réserver →" : "Book →"}
+                <div className="mt-4">
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold tracking-wide transition-all"
+                    style={{
+                      background: "rgba(244,197,106,0.15)",
+                      border: "1px solid rgba(244,197,106,0.35)",
+                      color: "rgba(244,197,106,0.85)",
+                    }}>
+                    {lang === "fr" ? "Réserver" : "Book"} →
+                  </span>
                 </div>
               </Link>
             ))}
@@ -198,7 +349,12 @@ export default function HomePage() {
             <Link
               href="/services"
               className="inline-flex items-center gap-2 px-6 py-3 text-white font-semibold rounded-xl transition-all text-sm"
-              style={{ background: "rgba(255,255,255,0.2)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.35)" }}
+              style={{
+                background: "rgba(255,255,255,0.10)",
+                backdropFilter: "blur(10px)",
+                border: "1px solid rgba(244,197,106,0.30)",
+                boxShadow: "0 2px 16px rgba(0,0,0,0.14)",
+              }}
             >
               {lang === "fr" ? "Voir tous les services" : "View all services"}
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -210,7 +366,7 @@ export default function HomePage() {
       </section>
 
       {/* ── GIFT CARDS ────────────────────────────────────────────────── */}
-      <section className="relative px-6 py-14 overflow-hidden z-[2]" style={{ background: "rgba(255,255,255,0.07)" }}>
+      <section className="relative px-6 py-14 overflow-hidden z-[2]">
         <div className="relative z-10 max-w-xl mx-auto text-center">
           <div className="text-3xl mb-4">🎁</div>
           <h2 className="text-2xl font-bold text-white mb-3">
@@ -226,14 +382,24 @@ export default function HomePage() {
               href={business.gift_card_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block px-8 py-3.5 bg-white text-sidebar font-bold rounded-xl hover:bg-brand-50 transition-colors text-sm shadow-xl"
+              className="inline-block px-8 py-3.5 font-bold rounded-xl transition-all text-sm"
+              style={{
+                background: "linear-gradient(135deg, #f4c56a 0%, #e8b050 100%)",
+                color: "#4a1a00",
+                boxShadow: "0 4px 20px rgba(244,197,106,0.35), 0 1px 0 rgba(255,255,255,0.25) inset",
+              }}
             >
               {lang === "fr" ? "Acheter une carte-cadeau" : "Buy a gift card"}
             </a>
           ) : (
             <a
               href={`mailto:${business?.email ?? "onglesnatalia@gmail.com"}`}
-              className="inline-block px-8 py-3.5 bg-white text-sidebar font-bold rounded-xl hover:bg-brand-50 transition-colors text-sm shadow-xl"
+              className="inline-block px-8 py-3.5 font-bold rounded-xl transition-all text-sm"
+              style={{
+                background: "linear-gradient(135deg, #f4c56a 0%, #e8b050 100%)",
+                color: "#4a1a00",
+                boxShadow: "0 4px 20px rgba(244,197,106,0.35), 0 1px 0 rgba(255,255,255,0.25) inset",
+              }}
             >
               {lang === "fr" ? "Nous contacter pour une carte-cadeau" : "Contact us for a gift card"}
             </a>
@@ -251,12 +417,11 @@ export default function HomePage() {
             <h2 className="text-3xl font-bold text-white">
               {lang === "fr" ? "Contact & Horaires" : "Contact & Hours"}
             </h2>
-            <div className="w-12 h-0.5 mx-auto mt-3" style={{ background: "linear-gradient(90deg, rgba(255,255,255,0.9), rgba(255,62,191,0.6))" }} />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Contact */}
-            <div className="rounded-2xl p-6 space-y-4" style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.25)" }}>
+            <div className="rounded-2xl p-6 space-y-4" style={{ background: "rgba(255,255,255,0.09)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.18)", boxShadow: "0 8px 32px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.12)" }}>
               <h3 className="font-bold text-white mb-4">{lang === "fr" ? "Nous contacter" : "Contact us"}</h3>
               {[
                 {
@@ -265,6 +430,7 @@ export default function HomePage() {
                   ),
                   label: business?.address ?? "6362 Alexis-Contant, Montréal, QC, H1M 1E9",
                   href: `https://maps.google.com/?q=${encodeURIComponent(business?.address ?? "6362 Alexis-Contant Montreal")}`,
+                  newTab: true,
                 },
                 {
                   icon: (
@@ -272,6 +438,7 @@ export default function HomePage() {
                   ),
                   label: business?.phone ?? "+1 514-652-6284",
                   href: `tel:${business?.phone ?? "+15146526284"}`,
+                  newTab: false,
                 },
                 {
                   icon: (
@@ -279,9 +446,10 @@ export default function HomePage() {
                   ),
                   label: business?.email ?? "onglesnatalia@gmail.com",
                   href: `mailto:${business?.email ?? "onglesnatalia@gmail.com"}`,
+                  newTab: false,
                 },
               ].map((item, i) => (
-                <a key={i} href={item.href} target="_blank" rel="noopener noreferrer"
+                <a key={i} href={item.href} {...(item.newTab ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                   className="flex items-start gap-3 text-sm transition-colors text-white/80 hover:text-white">
                   <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 text-white" style={{ background: "rgba(244,197,106,0.2)", border: "1px solid rgba(244,197,106,0.45)" }}>
                     {item.icon}
@@ -304,7 +472,7 @@ export default function HomePage() {
             </div>
 
             {/* Hours */}
-            <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.25)" }}>
+            <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.09)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.18)", boxShadow: "0 8px 32px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.12)" }}>
               <h3 className="font-bold text-white mb-4">{lang === "fr" ? "Heures d'ouverture" : "Business hours"}</h3>
               <div className="space-y-2">
                 {[1, 2, 3, 4, 5, 6, 0].map((day) => {
@@ -333,7 +501,12 @@ export default function HomePage() {
             <Link
               href="/book"
               className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl font-bold text-white text-sm transition-all"
-              style={{ background: "rgba(255,255,255,0.22)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.4)" }}
+              style={{
+                background: "linear-gradient(135deg, rgba(244,197,106,0.22) 0%, rgba(255,255,255,0.14) 100%)",
+                backdropFilter: "blur(12px)",
+                border: "1px solid rgba(244,197,106,0.38)",
+                boxShadow: "0 4px 24px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.15)",
+              }}
             >
               {lang === "fr" ? "Prendre un rendez-vous" : "Book an appointment"}
             </Link>
@@ -341,8 +514,31 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ── FLOATING BOOK NOW ─────────────────────────────────────────── */}
+      <div
+        className="fixed right-5 z-50 pointer-events-none transition-all duration-300"
+        style={{
+          bottom: "calc(1.25rem + env(safe-area-inset-bottom, 0px))",
+          opacity: fabVisible ? 1 : 0,
+          transform: fabVisible ? "translateY(0) scale(1)" : "translateY(14px) scale(0.90)",
+        }}
+      >
+        <Link
+          href="/book"
+          className="pointer-events-auto btn-press flex items-center gap-1.5 px-4 py-2.5 rounded-full font-bold text-sm tracking-wide"
+          style={{
+            background: "linear-gradient(135deg, #f4c56a 0%, #e8b050 100%)",
+            color: "#3a0e00",
+            boxShadow: "0 4px 18px rgba(244,197,106,0.40)",
+          }}
+        >
+          <span className="text-xs">✦</span>
+          <span>{lang === "fr" ? "Réserver" : "Book now"}</span>
+        </Link>
+      </div>
+
       {/* ── FOOTER ────────────────────────────────────────────────────── */}
-      <footer className="relative z-[2] bg-sidebar text-white/50 px-6 py-8 text-center text-xs space-y-1">
+      <footer className="relative z-[2] text-white/40 px-6 py-8 text-center text-xs space-y-1">
         <div className="flex items-center justify-center gap-2.5 mb-3">
           <div style={{ width: 22, height: 22, borderRadius: 6, overflow: "hidden" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -361,6 +557,9 @@ export default function HomePage() {
           <a href="https://serverandtechsolutions.ca" target="_blank" rel="noopener noreferrer" className="hover:text-white/50 transition-colors">
             Built by Server &amp; Tech Solutions
           </a>
+        </p>
+        <p className="pt-1">
+          <Link href="/admin/login" className="text-white/10 hover:text-white/30 transition-colors text-[9px] tracking-widest select-none">·</Link>
         </p>
       </footer>
     </div>

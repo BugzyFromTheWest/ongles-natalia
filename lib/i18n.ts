@@ -17,7 +17,7 @@ export const translations = {
     services: [
       "Manicure",
       "Pedicure",
-      "Gel Manicure",
+
       "Gel Pedicure",
       "Acrylic Nails",
       "Nail Extensions",
